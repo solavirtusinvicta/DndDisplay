@@ -13,6 +13,7 @@ clients = set()
 STATIC_DIR = os.path.join(os.path.dirname(__file__), "static")
 assert os.path.isdir(STATIC_DIR)
 
+
 def remove_numbers(string: str) -> str:
     return re.sub(r'\d+', '', string)
 
@@ -94,9 +95,6 @@ class Characters:
 chars = Characters()
 
 
-# characters: Dict[str, Dict[str, Union[str, int]]] = {}  # { "Alice": {"hp": 20, "image": "/static/foo.png"}, ... }
-
-
 class MainHandler(tornado.web.RequestHandler):
     def get(self):
         self.write("Server running. Go to /control or /display.")
@@ -173,15 +171,28 @@ class DisplayHandler(tornado.web.RequestHandler):
         self.write("""
         <h1>Battlefield</h1>
         <div id="chars"></div>
+        <style>
+          body { font-family: sans-serif; background: grey; color: white; text-align: center; }
+          .char { margin: 20px; padding: 10px; border: 2px solid white; display: inline-block; width: 250px; background: #111; }
+          .name { font-size: 1.5em; margin-bottom: 5px; }
+          .hp-bar-bg { width: 100%; height: 25px; background: #555; border-radius: 5px; overflow: hidden; margin-bottom: 5px; }
+          .hp-bar { height: 100%; background: red; width: 100%; transition: width 0.3s; }
+          img { max-width: 100%; max-height: 150px; display: block; margin: auto; }
+        </style>
         <script>
         function render(chars) {
             let div = document.getElementById("chars");
             div.innerHTML = "";
             for (let c in chars) {
                 let char = chars[c];
-                div.innerHTML += `<div>
-                  <h2>${c} (HP: ${char.hp})</h2>
+                let hpPercent = Math.max(0, char.hp);
+                div.innerHTML += `<div class="char">
+                  <div class="name">${c}</div>
+                  <div class="hp-bar-bg">
+                      <div class="hp-bar" style="width:${hpPercent}%;"></div>
+                  </div>
                   ${char.image ? `<img src="${char.image}" width="150">` : ""}
+                  <div class="hp-text">HP: ${char.hp}</div>
                   </div>`;
             }
         }
