@@ -43,6 +43,10 @@ class Character:
     def name(self) -> str:
         return self._name
 
+    @property
+    def hp(self) -> int:
+        return self._hp
+
     def update(self, name: Optional[str], hp: Optional[int]):
         if name is not None:
             self._name = name
@@ -113,7 +117,7 @@ class ControlHandler(tornado.web.RequestHandler):
         self.write("""
         <h1>Control Panel</h1>
         <form id="addForm" enctype="multipart/form-data">
-            <input name="name" placeholder="Character Name">
+            <input name="name" placeholder="Character Name" pattern="[A-Za-z]+">
             <input name="hp" type="number" placeholder="HP">
             <input type="file" name="file">
             <button type="submit">Add Character</button>
@@ -127,18 +131,26 @@ class ControlHandler(tornado.web.RequestHandler):
             div.innerHTML = "";
             for (let c in chars) {
                 div.innerHTML += `<p>${c} (HP: ${chars[c].hp})
+                  <button onclick="updateChar('${c}', 1)">+1</button>
+                  <button onclick="updateChar('${c}', -1)">-1</button>
                   <button onclick="removeChar('${c}')">Remove</button></p>`;
             }
         }
 
         function removeChar(name) {
-            fetch("/remove", {method:"POST", headers:{"Content-Type":"application/json"},
-                body: JSON.stringify({name:name})});
+            fetch("/remove", {
+                method:"POST", 
+                headers:{"Content-Type":"application/json"},
+                body: JSON.stringify({name:name})
+            });
         }
         
-        function updateChar(name) {
-            fetch("/update", {method:"POST", headers:{"Content-Type":"application/json"},
-                body: JSON.stringify({name:name})});
+        function updateChar(name, delta) {
+            fetch("/update", {
+                method:"POST", 
+                headers:{"Content-Type":"application/json"},
+                body: JSON.stringify({name:name, delta:delta})
+            });
         }
 
         document.getElementById("addForm").addEventListener("submit", e=>{
@@ -185,13 +197,16 @@ class DisplayHandler(tornado.web.RequestHandler):
 
 class UpdateHandler(tornado.web.RequestHandler):
     def post(self):
-        name = self.get_body_argument("name")
-        hp = int(self.get_body_argument("hp"))
+        data = json.loads(self.request.body.decode())
+        name = data["name"]
+        delta = int(data.get("delta", 0))
         character = chars.get_by_name(name)
+
         if character is not None:
-            character.update(name, hp)
+            character.update(name, character.hp + delta)
+
         broadcast()
-        self.write("ok")
+        self.write({"status": "ok"})
 
 
 class UploadHandler(tornado.web.RequestHandler):
