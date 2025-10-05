@@ -34,9 +34,10 @@ def get_unique_name(name: str, name_list: List[str]) -> str:
 
 
 class Character:
-    def __init__(self, name: str, hp: int, img: str) -> None:
+    def __init__(self, name: str, hp: int, max_hp: int, img: str) -> None:
         self._name = name
         self._hp = hp
+        self._max_hp = max_hp
         self._img = img
         self._initiative: int = 0
 
@@ -48,6 +49,10 @@ class Character:
     def hp(self) -> int:
         return self._hp
 
+    @property
+    def max_hp(self) -> int:
+        return self._max_hp
+
     def update(self, name: Optional[str], hp: Optional[int]):
         if name is not None:
             self._name = name
@@ -55,7 +60,7 @@ class Character:
             self._hp = hp
 
     def entry(self) -> Dict[str, Union[str, int]]:
-        return {"hp": self._hp, "image": self._img}
+        return {"hp": self._hp, "maxHp": self._max_hp, "image": self._img}
 
 
 class Characters:
@@ -116,7 +121,8 @@ class ControlHandler(tornado.web.RequestHandler):
         <h1>Control Panel</h1>
         <form id="addForm" enctype="multipart/form-data">
             <input name="name" placeholder="Character Name" pattern="[A-Za-z]+">
-            <input name="hp" type="number" placeholder="HP">
+            <input name="hp" type="number" placeholder="HP" size="10"><span> / </span>
+            <input name="maxHp" type="number" placeholder="MaxHP" size="10">
             <input type="file" name="file">
             <button type="submit">Add Character</button>
         </form>
@@ -209,7 +215,7 @@ class DisplayHandler(tornado.web.RequestHandler):
           .hp-bar-bg {
             width: 100%;
             height: 20px;
-            background: #555;
+            background: #801401;
             border-radius: 5px;
             overflow: hidden;
             margin-bottom: 5px;
@@ -217,7 +223,7 @@ class DisplayHandler(tornado.web.RequestHandler):
         
           .hp-bar {
             height: 100%;
-            background: red;
+            background: green;
             width: 100%;
             transition: width 0.3s;
           }
@@ -241,14 +247,14 @@ class DisplayHandler(tornado.web.RequestHandler):
             div.innerHTML = "";
             for (let c in chars) {
                 let char = chars[c];
-                let hpPercent = Math.max(0, char.hp);
+                let hpPercent = (Math.max(0, char.hp) / Math.max(char.hp, char.maxHp)) * 100;
                 div.innerHTML += `<div class="char">
                   <div class="name">${c}</div>
                   <div class="hp-bar-bg">
                       <div class="hp-bar" style="width:${hpPercent}%;"></div>
                   </div>
                   ${char.image ? `<img src="${char.image}" width="150">` : ""}
-                  <div class="hp-text">HP: ${char.hp}</div>
+                  <div class="hp-text">HP: ${char.hp} / ${char.maxHp}</div>
                   </div>`;
             }
         }
@@ -311,6 +317,7 @@ class AddHandler(tornado.web.RequestHandler):
     def post(self):
         name = self.get_body_argument("name")
         hp = int(self.get_body_argument("hp"))
+        max_hp = int(self.get_body_argument("maxHp"))
         image_url = ""
         if "file" in self.request.files:
             fileinfo = self.request.files["file"][0]
@@ -318,7 +325,7 @@ class AddHandler(tornado.web.RequestHandler):
             with open(filepath, "wb") as f:
                 f.write(fileinfo["body"])
             image_url = f"/static/{fileinfo['filename']}"
-        chars.add(Character(name, hp, image_url))
+        chars.add(Character(name, hp, max_hp, image_url))
         broadcast()
 
 
