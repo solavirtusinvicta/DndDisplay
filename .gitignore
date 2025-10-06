@@ -182,3 +182,4 @@ cython_debug/
 /static/
 /saves
 .idea
+.idea/misc.xml

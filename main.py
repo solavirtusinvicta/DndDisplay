@@ -155,15 +155,12 @@ class ControlHandler(tornado.web.RequestHandler):
                   <button id="addAbilityBtn${c}">Add Ability</button>
                   <p>Abilities:</p>`;
                 
-                if (char.abilities.length == 0) {
-                  return;
-                }
-                
-                console.log(char.abilities);
-                for (let a of char.abilities.split(",")) {
-                    div.innerHTML += `<span>${a} | Available: </span>
-                    <input type="checkbox" name="available${c}${a}" value="value1">
-                    <button onclick="removeAbility('${c}', '${a}')">Remove Ability</button></p>`;
+                if (char.abilities.length !== 0) {
+                    for (let a of char.abilities.split(",")) {
+                        div.innerHTML += `<span>${a} | Available: </span>
+                        <input type="checkbox" name="available${c}${a}" value="value1">
+                        <button onclick="removeAbility('${c}', '${a}')">Remove Ability</button></p>`;
+                    }
                 }
             }
             
