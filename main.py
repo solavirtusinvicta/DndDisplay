@@ -1,7 +1,6 @@
 import json
 import os
 import re
-from dataclasses import dataclass
 from typing import Union, Dict, List, Optional
 
 import tornado.ioloop
@@ -134,7 +133,7 @@ class ControlHandler(tornado.web.RequestHandler):
             let div = document.getElementById("charList");
             div.innerHTML = "";
             for (let c in chars) {
-                div.innerHTML += `<p>${c} (HP: ${chars[c].hp})
+                div.innerHTML += `<p>${c} (HP: ${chars[c].hp} / ${chars[c].maxHp})
                   <button onclick="updateChar('${c}', 1)">+1</button>
                   <button onclick="updateChar('${c}', -1)">-1</button>
                   <button onclick="removeChar('${c}')">Remove</button></p>`;
