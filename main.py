@@ -38,7 +38,8 @@ class Character:
         self._hp = hp
         self._max_hp = max_hp
         self._img = img
-        self._initiative: int = 0
+        self._initiative = 0
+        self._abilities: List[str] = []
 
     @property
     def name(self) -> str:
@@ -52,6 +53,18 @@ class Character:
     def max_hp(self) -> int:
         return self._max_hp
 
+    @property
+    def abilities(self) -> List[str]:
+        return self._abilities
+
+    def add_ability(self, name: str) -> None:
+        if name not in self._abilities:
+            self._abilities.append(name)
+
+    def remove_ability(self, name: str) -> None:
+        if name in self._abilities:
+            self._abilities.remove(name)
+
     def update(self, name: Optional[str], hp: Optional[int]):
         if name is not None:
             self._name = name
@@ -59,7 +72,7 @@ class Character:
             self._hp = hp
 
     def entry(self) -> Dict[str, Union[str, int]]:
-        return {"hp": self._hp, "maxHp": self._max_hp, "image": self._img}
+        return {"hp": self._hp, "maxHp": self._max_hp, "image": self._img, "abilities": ",".join(self._abilities)}
 
 
 class Characters:
@@ -120,8 +133,8 @@ class ControlHandler(tornado.web.RequestHandler):
         <h1>Control Panel</h1>
         <form id="addForm" enctype="multipart/form-data">
             <input name="name" placeholder="Character Name" pattern="[A-Za-z]+">
-            <input name="hp" type="number" placeholder="HP" size="10"><span> / </span>
-            <input name="maxHp" type="number" placeholder="MaxHP" size="10">
+            <input name="hp" type="number" placeholder="HP" size="5"><span> / </span>
+            <input name="maxHp" type="number" placeholder="MaxHP" size="5">
             <input type="file" name="file">
             <button type="submit">Add Character</button>
         </form>
@@ -133,11 +146,49 @@ class ControlHandler(tornado.web.RequestHandler):
             let div = document.getElementById("charList");
             div.innerHTML = "";
             for (let c in chars) {
+                let char = chars[c];
                 div.innerHTML += `<p>${c} (HP: ${chars[c].hp} / ${chars[c].maxHp})
                   <button onclick="updateChar('${c}', 1)">+1</button>
                   <button onclick="updateChar('${c}', -1)">-1</button>
-                  <button onclick="removeChar('${c}')">Remove</button></p>`;
+                  <button onclick="removeChar('${c}')">Remove</button></p>
+                  <input id="abilityInput${c}" name="ability" placeholder="Ability Name" pattern="[A-Za-z]+">
+                  <button id="addAbilityBtn${c}">Add Ability</button>
+                  <p>Abilities:</p>`;
+                
+                if (char.abilities.length == 0) {
+                  return;
+                }
+                
+                console.log(char.abilities);
+                for (let a of char.abilities.split(",")) {
+                    div.innerHTML += `<span>${a} | Available: </span>
+                    <input type="checkbox" name="available${c}${a}" value="value1">
+                    <button onclick="removeAbility('${c}', '${a}')">Remove Ability</button></p>`;
+                }
             }
+            
+            div.addEventListener("click", function(e) {
+                if (e.target.matches("button[id^='addAbilityBtn']")) {
+                    const c = e.target.id.replace("addAbilityBtn", "");
+                    const abilityName = document.getElementById("abilityInput" + c).value;
+                    addAbility(c, abilityName);
+                }
+            });
+        }
+        
+        function removeAbility(name, ability) {
+            fetch("/removeAbility", {
+                method:"POST", 
+                headers:{"Content-Type":"application/json"},
+                body: JSON.stringify({name:name, ability:ability})
+            });
+        }        
+        function addAbility(name, ability) {
+            fetch("/addAbility", {
+                method:"POST", 
+                headers:{"Content-Type":"application/json"},
+                body: JSON.stringify({name:name, ability:ability})
+            });
         }
 
         function removeChar(name) {
@@ -186,13 +237,12 @@ class DisplayHandler(tornado.web.RequestHandler):
             padding: 0;
           }
         
-          /* container for all characters */
           #chars {
             display: flex;
-            justify-content: center; /* center rows */
+            justify-content: center;
             align-items: flex-start;
-            gap: 10px;               /* space between cards */
-            overflow: hidden;        /* no scrollbars */
+            gap: 10px; 
+            overflow: hidden;
             padding: 10px;
           }
         
@@ -201,8 +251,8 @@ class DisplayHandler(tornado.web.RequestHandler):
             padding: 10px;
             border: 2px solid white;
             background: #111;
-            flex: 1 1 180px;         /* allow shrink/grow with min width */
-            max-width: 220px;        /* prevent cards from being huge */
+            flex: 1 1 180px;   
+            max-width: 220px;
             text-align: center;
           }
         
@@ -328,6 +378,25 @@ class AddHandler(tornado.web.RequestHandler):
         broadcast()
 
 
+class AddAbilityHandler(tornado.web.RequestHandler):
+    def post(self):
+        data = json.loads(self.request.body.decode())
+        name = data["name"]
+        ability = data["ability"]
+        chars.get_by_name(name).add_ability(ability)
+        broadcast()
+
+
+class RemoveAbilityHandler(tornado.web.RequestHandler):
+    def post(self):
+        data = json.loads(self.request.body.decode())
+        name = data["name"]
+        ability = data["ability"]
+
+        chars.get_by_name(name).remove_ability(ability)
+        broadcast()
+
+
 class RemoveHandler(tornado.web.RequestHandler):
     def post(self):
         data = json.loads(self.request.body.decode())
@@ -343,6 +412,8 @@ def make_app():
         (r"/display", DisplayHandler),
         (r"/ws", WSHandler),
         (r"/add", AddHandler),
+        (r"/addAbility", AddAbilityHandler),
+        (r"/removeAbility", RemoveAbilityHandler),
         (r"/remove", RemoveHandler),
         (r"/update", UpdateHandler),
         (r"/static/(.*)", tornado.web.StaticFileHandler, {"path": STATIC_DIR}),
