@@ -136,9 +136,9 @@ class ControlHandler(tornado.web.RequestHandler):
         self.write("""
         <h1>Control Panel</h1>
         <form id="addForm" enctype="multipart/form-data">
-            <input name="name" placeholder="Character Name" pattern="[A-Za-z]+">
-            <input name="hp" type="number" placeholder="HP" size="5"><span> / </span>
-            <input name="maxHp" type="number" placeholder="MaxHP" size="5">
+            <input name="name" placeholder="Character Name" pattern="[A-Za-z]+" required>
+            <input name="hp" type="number" placeholder="HP" size="5" required><span> / </span>
+            <input name="maxHp" type="number" placeholder="MaxHP" size="5 required">
             <input type="file" name="file">
             <button type="submit">Add Character</button>
         </form>
@@ -155,7 +155,7 @@ class ControlHandler(tornado.web.RequestHandler):
                   <button onclick="updateChar('${c}', 1)">+1</button>
                   <button onclick="updateChar('${c}', -1)">-1</button>
                   <button onclick="removeChar('${c}')">Remove</button></p>
-                  <input id="abilityInput${c}" name="ability" placeholder="Ability Name" pattern="[A-Za-z]+">
+                  <input id="abilityInput${c}" name="ability" placeholder="Ability Name" pattern="[A-Za-z]+" required>
                   <button id="addAbilityBtn${c}">Add Ability</button>
                   <p>Abilities:</p>`;
                 
