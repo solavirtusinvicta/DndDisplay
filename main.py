@@ -1,7 +1,7 @@
 import json
 import os
 import re
-from typing import Union, Dict, List, Optional
+from typing import Union, Dict, List, Optional, Tuple
 
 import tornado.ioloop
 import tornado.web
@@ -39,7 +39,7 @@ class Character:
         self._max_hp = max_hp
         self._img = img
         self._initiative = 0
-        self._abilities: List[str] = []
+        self._abilities: Dict[str, str] = {}
 
     @property
     def name(self) -> str:
@@ -54,16 +54,20 @@ class Character:
         return self._max_hp
 
     @property
-    def abilities(self) -> List[str]:
-        return self._abilities
+    def abilities(self) -> Tuple[str, ...]:
+        return tuple(self._abilities)
 
     def add_ability(self, name: str) -> None:
         if name not in self._abilities:
-            self._abilities.append(name)
+            self._abilities[name] = "1"
 
     def remove_ability(self, name: str) -> None:
         if name in self._abilities:
-            self._abilities.remove(name)
+            del self._abilities[name]
+
+    def toggle_ability(self, name: str) -> None:
+        if name in self._abilities:
+            self._abilities[name] = "0" if self._abilities[name] == "1" else "1"
 
     def update(self, name: Optional[str], hp: Optional[int]):
         if name is not None:
@@ -72,7 +76,7 @@ class Character:
             self._hp = hp
 
     def entry(self) -> Dict[str, Union[str, int]]:
-        return {"hp": self._hp, "maxHp": self._max_hp, "image": self._img, "abilities": ",".join(self._abilities)}
+        return {"hp": self._hp, "maxHp": self._max_hp, "image": self._img, "abilities": ",".join(self._abilities.keys()), "abilityAvailable": ",".join(self._abilities.values())}
 
 
 class Characters:
@@ -157,9 +161,10 @@ class ControlHandler(tornado.web.RequestHandler):
                 
                 if (char.abilities.length !== 0) {
                     for (let a of char.abilities.split(",")) {
+                        const checked = char.abilityAvailable.split(",")[char.abilities.split(",").indexOf(a)] === "1";
                         div.innerHTML += `<span>${a} | Available: </span>
-                        <input type="checkbox" name="available${c}${a}" value="value1">
-                        <button onclick="removeAbility('${c}', '${a}')">Remove Ability</button></p>`;
+                          <input type="checkbox" name="available${c}${a}" value="value1" ${checked ? "checked" : ""} onchange="setAvailableAbilities('${c}', '${a}')">
+                          <button onclick="removeAbility('${c}', '${a}')">Remove Ability</button></p>`;
                     }
                 }
             }
@@ -179,7 +184,8 @@ class ControlHandler(tornado.web.RequestHandler):
                 headers:{"Content-Type":"application/json"},
                 body: JSON.stringify({name:name, ability:ability})
             });
-        }        
+        }     
+        
         function addAbility(name, ability) {
             fetch("/addAbility", {
                 method:"POST", 
@@ -201,6 +207,14 @@ class ControlHandler(tornado.web.RequestHandler):
                 method:"POST", 
                 headers:{"Content-Type":"application/json"},
                 body: JSON.stringify({name:name, delta:delta})
+            });
+        }
+
+        function setAvailableAbilities(charName, ability) {
+            fetch("/setAvailableAbilities", {
+                method: "POST",
+                headers: {"Content-Type": "application/json"},
+                body: JSON.stringify({name: charName, ability: ability})
             });
         }
 
@@ -301,7 +315,17 @@ class DisplayHandler(tornado.web.RequestHandler):
                   </div>
                   ${char.image ? `<img src="${char.image}" width="150">` : ""}
                   <div class="hp-text">HP: ${char.hp} / ${char.maxHp}</div>
-                  </div>`;
+                  <div class="abilities">
+                    Abilities: ${
+                      console.log(char.abilities, char.abilityAvailable),
+                      char.abilities && char.abilityAvailable
+                        ? char.abilities
+                            .split(",")
+                            .filter((a, i) => char.abilityAvailable.split(",")[i] === "1")
+                            .join(", ") || "None"
+                        : "None"
+                  }</div>                
+                </div>`;
             }
         }
 
@@ -401,6 +425,15 @@ class RemoveHandler(tornado.web.RequestHandler):
         chars.remove_by_name(name)
         broadcast()
 
+class SetAvailableAbilitiesHandler(tornado.web.RequestHandler):
+    def post(self):
+        data = json.loads(self.request.body.decode())
+        name = data["name"]
+        ability = data["ability"]  # list of ability names
+        char = chars.get_by_name(name)
+        if char:
+            char.toggle_ability(ability)
+            broadcast()
 
 def make_app():
     return tornado.web.Application([
@@ -413,6 +446,7 @@ def make_app():
         (r"/removeAbility", RemoveAbilityHandler),
         (r"/remove", RemoveHandler),
         (r"/update", UpdateHandler),
+        (r"/setAvailableAbilities", SetAvailableAbilitiesHandler),
         (r"/static/(.*)", tornado.web.StaticFileHandler, {"path": STATIC_DIR}),
     ], debug=True)
 
