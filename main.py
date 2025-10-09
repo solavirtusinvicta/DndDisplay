@@ -54,6 +54,10 @@ class Character:
         return self._max_hp
 
     @property
+    def initiative(self) -> int:
+        return self._initiative
+
+    @property
     def abilities(self) -> Tuple[str, ...]:
         return tuple(self._abilities)
 
@@ -69,14 +73,24 @@ class Character:
         if name in self._abilities:
             self._abilities[name] = "0" if self._abilities[name] == "1" else "1"
 
-    def update(self, name: Optional[str], hp: Optional[int]):
+    def update_hp(self, name: Optional[str], hp: Optional[int]):
         if name is not None:
             self._name = name
         if hp is not None:
             self._hp = hp
 
+    def update_initiative(self, initiative: int) -> None:
+        self._initiative = initiative
+
     def entry(self) -> Dict[str, Union[str, int]]:
-        return {"hp": self._hp, "maxHp": self._max_hp, "image": self._img, "abilities": ",".join(self._abilities.keys()), "abilityAvailable": ",".join(self._abilities.values())}
+        return {
+            "hp": self._hp,
+            "maxHp": self._max_hp,
+            "image": self._img,
+            "initiative": self._initiative,
+            "abilities": ",".join(self._abilities.keys()),
+            "abilityAvailable": ",".join(self._abilities.values())
+        }
 
 
 class Characters:
@@ -97,7 +111,7 @@ class Characters:
         new_char = character
         character_names = self.get_character_names()
         if new_char.name in character_names:
-            new_char.update(name=get_unique_name(new_char.name, character_names), hp=None)
+            new_char.update_hp(name=get_unique_name(new_char.name, character_names), hp=None)
 
         self._characters.append(new_char)
 
@@ -137,8 +151,8 @@ class ControlHandler(tornado.web.RequestHandler):
         <h1>Control Panel</h1>
         <form id="addForm" enctype="multipart/form-data">
             <input name="name" placeholder="Character Name" pattern="[A-Za-z]+" required>
-            <input name="hp" type="number" placeholder="HP" size="5" required><span> / </span>
-            <input name="maxHp" type="number" placeholder="MaxHP" size="5 required">
+            <input name="hp" type="number" placeholder="HP" style="width: 50px" required><span> / </span>
+            <input name="maxHp" type="number" placeholder="MaxHP" style="width: 50px" required>
             <input type="file" name="file">
             <button type="submit">Add Character</button>
         </form>
@@ -155,6 +169,8 @@ class ControlHandler(tornado.web.RequestHandler):
                   <button onclick="updateChar('${c}', 1)">+1</button>
                   <button onclick="updateChar('${c}', -1)">-1</button>
                   <button onclick="removeChar('${c}')">Remove</button></p>
+                  <span>Initiative: ${chars[c].initiative} </span><input id="initiative${c}" name="initiative" type="number" placeholder="Initiative" style="width: 45px">
+                  <button id="updateInitiative${c}">Update</button>
                   <input id="abilityInput${c}" name="ability" placeholder="Ability Name" pattern="[A-Za-z]+" required>
                   <button id="addAbilityBtn${c}">Add Ability</button>
                   <p>Abilities:</p>`;
@@ -175,6 +191,11 @@ class ControlHandler(tornado.web.RequestHandler):
                     const abilityName = document.getElementById("abilityInput" + c).value;
                     addAbility(c, abilityName);
                 }
+                if (e.target.matches("button[id^='updateInitiative']")) {
+                    const c = e.target.id.replace("updateInitiative", "");
+                    const initiative = document.getElementById("initiative" + c).value;
+                    updateInitiative(c, initiative);
+                }
             });
         }
         
@@ -184,13 +205,21 @@ class ControlHandler(tornado.web.RequestHandler):
                 headers:{"Content-Type":"application/json"},
                 body: JSON.stringify({name:name, ability:ability})
             });
-        }     
+        }
         
         function addAbility(name, ability) {
             fetch("/addAbility", {
                 method:"POST", 
                 headers:{"Content-Type":"application/json"},
                 body: JSON.stringify({name:name, ability:ability})
+            });
+        }
+        
+        function updateInitiative(name, initiative) {
+            fetch("/updateInitiative", {
+                method:"POST", 
+                headers:{"Content-Type":"application/json"},
+                body: JSON.stringify({name:name, initiative:initiative})
             });
         }
 
@@ -271,6 +300,12 @@ class DisplayHandler(tornado.web.RequestHandler):
             font-size: 1.2em;
             margin-bottom: 5px;
           }
+          
+          .initiative {
+            font-size: 1.5em;
+            font-weight: bold;
+            text-align: right;
+          }
         
           .hp-bar-bg {
             width: 100%;
@@ -309,7 +344,7 @@ class DisplayHandler(tornado.web.RequestHandler):
                 let char = chars[c];
                 let hpPercent = (Math.max(0, char.hp) / Math.max(char.hp, char.maxHp)) * 100;
                 div.innerHTML += `<div class="char">
-                  <div class="name">${c}</div>
+                  <div class="name">${c}<div class="initiative">${char.initiative}</div></div>
                   <div class="hp-bar-bg">
                       <div class="hp-bar" style="width:${hpPercent}%;"></div>
                   </div>
@@ -317,7 +352,6 @@ class DisplayHandler(tornado.web.RequestHandler):
                   <div class="hp-text">HP: ${char.hp} / ${char.maxHp}</div>
                   <div class="abilities">
                     Abilities: ${
-                      console.log(char.abilities, char.abilityAvailable),
                       char.abilities && char.abilityAvailable
                         ? char.abilities
                             .split(",")
@@ -338,7 +372,7 @@ class DisplayHandler(tornado.web.RequestHandler):
         """)
 
 
-class UpdateHandler(tornado.web.RequestHandler):
+class UpdateHpHandler(tornado.web.RequestHandler):
     def post(self):
         data = json.loads(self.request.body.decode())
         name = data["name"]
@@ -346,7 +380,21 @@ class UpdateHandler(tornado.web.RequestHandler):
         character = chars.get_by_name(name)
 
         if character is not None:
-            character.update(name, character.hp + delta)
+            character.update_hp(name, character.hp + delta)
+
+        broadcast()
+        self.write({"status": "ok"})
+
+
+class UpdateInitiativeHandler(tornado.web.RequestHandler):
+    def post(self):
+        data = json.loads(self.request.body.decode())
+        name = data["name"]
+        initiative = int(data.get("initiative", 0))
+        character = chars.get_by_name(name)
+
+        if character is not None:
+            character.update_initiative(initiative)
 
         broadcast()
         self.write({"status": "ok"})
@@ -445,7 +493,8 @@ def make_app():
         (r"/addAbility", AddAbilityHandler),
         (r"/removeAbility", RemoveAbilityHandler),
         (r"/remove", RemoveHandler),
-        (r"/update", UpdateHandler),
+        (r"/update", UpdateHpHandler),
+        (r"/updateInitiative", UpdateInitiativeHandler),
         (r"/setAvailableAbilities", SetAvailableAbilitiesHandler),
         (r"/static/(.*)", tornado.web.StaticFileHandler, {"path": STATIC_DIR}),
     ], debug=True)
