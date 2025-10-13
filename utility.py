@@ -1,5 +1,11 @@
+import os
 import re
-from typing import List
+from enum import Enum
+from pathlib import Path
+from typing import List, Union
+
+STATIC_DIR = Path(os.path.join(os.path.dirname(__file__), "static"))
+BG_DIR = STATIC_DIR / "backgrounds"
 
 
 def remove_numbers(string: str) -> str:
@@ -20,3 +26,10 @@ def get_unique_name(name: str, name_list: List[str]) -> str:
 
     return name
 
+def get_options() -> dict[str, List[Union[str]]]:
+    return {"weatherOptions": [str(weather.name.lower()) for weather in Weather], "backgroundOptions": os.listdir(BG_DIR)}
+
+class Weather(Enum):
+    CLEAR = "clear"
+    RAIN = "rain"
+    FOG = "fog"

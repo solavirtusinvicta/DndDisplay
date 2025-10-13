@@ -5,6 +5,9 @@ class DisplayHandler(tornado.web.RequestHandler):
     def get(self):
         self.write("""
         <h1>Battlefield</h1>
+        <div id="header"></div>
+        <div id="weather-effects"></div>
+        <div id="weather"></div>
         <div id="chars"></div>
         <style>
           body {
@@ -14,6 +17,22 @@ class DisplayHandler(tornado.web.RequestHandler):
             text-align: center;
             margin: 0;
             padding: 0;
+            overflow: hidden;
+          }
+          
+          #weather-effects {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            pointer-events: none;
+            z-index: 0;
+          }
+          
+          #header, #weather, #chars {
+            position: relative;
+            z-index: 1;
           }
 
           #chars {
@@ -73,6 +92,37 @@ class DisplayHandler(tornado.web.RequestHandler):
             display: block;
             margin: auto;
           }
+          
+          .raindrop {
+            width: 2px;
+            height: 20px;
+            background-color: white;
+            animation: fall linear infinite;
+            position: absolute;
+            top: 0;
+          }
+          
+          .fog {
+            width: 1600px;
+            height: 1000px;
+            background-image: url('static/utility/fog.png');
+            background-position: center;
+            background-repeat: no-repeat;
+            background-size: cover;
+            animation: simmerLeft 100000s linear infinite;
+            position: absolute;
+            top: 0;
+          }
+
+          @keyframes fall {
+            from { top: -20px; }
+            to { top: 100vh; }
+          }
+          
+          @keyframes simmerLeft {
+            from { left: -1600px; }
+            to { left: 20vw; }
+          }
         </style>
 
         <script>
@@ -102,10 +152,94 @@ class DisplayHandler(tornado.web.RequestHandler):
             }
         }
 
+        function rerenderBackground(data) {
+            if (!data || !data.background) {
+                document.body.style.background = ``;
+                return;
+            };
+            document.body.style.backgroundImage = `url('static/backgrounds/${data.background}')`;
+            document.body.style.backgroundRepeat = 'no-repeat';
+            document.body.style.backgroundPosition = 'center center';
+        }
+        
+        function rain() {
+            const raindrop = document.createElement('div');
+            raindrop.classList.add('raindrop');
+            raindrop.style.left = Math.random() * window.innerWidth + 'px';
+            raindrop.style.animationDuration = (0.5 + Math.random()) + 's';
+            document.getElementById('weather-effects').appendChild(raindrop);
+            setTimeout(() => {
+                raindrop.remove();
+            }, 2000);
+        }
+
+        function fog() {
+            const fog = document.createElement('div');
+            fog.classList.add('fog');
+            fog.style.left = '-1600px';
+            fog.style.animationDuration = (0.5 + Math.random()) + 's';
+            document.getElementById('weather-effects').appendChild(fog);
+            setTimeout(() => {
+                fog.remove();
+            }, 3000);
+        }
+        
+        function startRain() {
+            if (rainInterval === null) {
+                rainInterval = setInterval(rain, 100);
+            }
+        }
+        
+        function startFog() {
+            if (fogInterval === null) {
+                fogInterval = setInterval(fog, 3000);
+            }
+        }
+
+        function clearRaindrops() {
+            document.querySelectorAll('.raindrop').forEach(drop => drop.remove());
+            clearInterval(rainInterval);
+            rainInterval = null;
+        }
+
+        function clearFog() {
+            document.querySelectorAll('.fog').forEach(cloud => cloud.remove());
+            clearInterval(fogInterval);
+            fogInterval = null;
+        }
+        
+        function updateWeather(weather) {
+            if (weather === "rain") {
+                console.log("Starting rain");
+                document.getElementById("weather").innerText = "🌧️ Raining";
+                clearFog();
+                startRain();
+            } else if (weather === "fog") {
+                console.log("Starting fog");
+                document.getElementById("weather").innerText = "🌫️ Foggy";
+                clearRaindrops();
+                startFog();
+            } else {
+                console.log("Clearing weather effects");
+                document.getElementById("weather").innerText = "☀️ Clear";
+                clearRaindrops();
+                clearFog();
+            }
+        }
+              
+        let rainInterval = null;
+        let fogInterval = null
+
         let ws = new WebSocket("ws://" + location.host + "/ws");
         ws.onmessage = (msg)=>{
             let data = JSON.parse(msg.data);
             if (data.characters) render(data.characters);
+            if (data.background) {
+                rerenderBackground(data);
+            }
+            if (data.weather) {
+                updateWeather(data.weather);
+            }
         };
         </script>
         """)

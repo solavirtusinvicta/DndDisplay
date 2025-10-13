@@ -5,17 +5,41 @@ class ControlHandler(tornado.web.RequestHandler):
     def get(self):
         self.write("""
         <h1>Control Panel</h1>
+        <div id="background"></div>
+        <button type="submit">Set Background</button>
         <form id="addForm" enctype="multipart/form-data">
-            <input name="name" placeholder="Character Name" pattern="[A-Za-z]+" required>
-            <input name="hp" type="number" placeholder="HP" style="width: 50px" required><span> / </span>
-            <input name="maxHp" type="number" placeholder="MaxHP" style="width: 50px" required>
-            <input type="file" name="file">
-            <button type="submit">Add Character</button>
+          <input name="name" placeholder="Character Name" pattern="[A-Za-z]+" required>
+          <input name="hp" type="number" placeholder="HP" style="width: 50px" required><span> / </span>
+          <input name="maxHp" type="number" placeholder="MaxHP" style="width: 50px" required>
+          <input type="file" name="file">
+          <button type="submit">Add Character</button>
         </form>
         <hr>
         <div id="charList"></div>
 
         <script>
+        function refreshGlobal(backgrounds, weathers, currentBg, currentWeather) {
+            let div = document.getElementById("background");
+            let html = `
+              <label for="backgroundSelect">Background:</label>
+              <select name="background" id="backgroundSelect" onchange="setBg(this.value)">
+            `;
+            for (let bg of backgrounds) {
+                html += `<option value="${bg}" ${bg === currentBg ? " selected" : ""}>${bg}</option>`;
+            }
+            html += "</select>";
+
+            html += `
+              <label for="backgroundSelect">Weather:</label>
+              <select name="weather" id="weatherSelect" onchange="setWeather(this.value)">
+            `;
+            for (let w of weathers) {
+                html += `<option value="${w}" ${w === currentWeather ? " selected" : ""}>${w}</option>`;
+            }
+            html += "</select>";
+            div.innerHTML = html;
+        }
+        
         function refreshList(chars) {
             let div = document.getElementById("charList");
             div.innerHTML = "";
@@ -52,6 +76,21 @@ class ControlHandler(tornado.web.RequestHandler):
                     const initiative = document.getElementById("initiative" + c).value;
                     updateInitiative(c, initiative);
                 }
+            });
+        }
+        
+        function setBg(bg) {
+            fetch("/setBg", {
+                method:"POST",
+                headers:{"Content-Type":"application/json"},
+                body: JSON.stringify({background:bg})
+            });
+        }
+        function setWeather(weather) {
+            fetch("/setWeather", {
+                method:"POST",
+                headers:{"Content-Type":"application/json"},
+                body: JSON.stringify({weather:weather})
             });
         }
 
@@ -112,7 +151,11 @@ class ControlHandler(tornado.web.RequestHandler):
         let ws = new WebSocket("ws://" + location.host + "/ws");
         ws.onmessage = (msg)=>{
             let data = JSON.parse(msg.data);
+            console.log(data);
             if (data.characters) refreshList(data.characters);
+            if (data.backgroundOptions && data.weatherOptions) {
+                refreshGlobal(data.backgroundOptions, data.weatherOptions, data.background, data.weather);            
+            }
         };
         </script>
         """)

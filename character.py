@@ -1,6 +1,6 @@
 from typing import Dict, Tuple, Optional, Union, List
 
-from utility import get_unique_name
+from utility import get_unique_name, Weather
 
 
 class Character:
@@ -64,21 +64,37 @@ class Character:
         }
 
 
-class Characters:
+class WebpageData:
     def __init__(self) -> None:
         self._characters: List[Character] = []
+        self._background = "village.png"
+        self._weather = Weather.CLEAR
+
+    @property
+    def background(self) -> str:
+        return self._background
+
+    @property
+    def weather(self) -> Weather:
+        return self._weather
+
+    def set_background(self, background: str) -> None:
+        self._background = background
+
+    def set_weather(self, weather: Weather) -> None:
+        self._weather = weather
 
     def get_character_names(self) -> List[str]:
         return [x.name for x in self._characters]
 
-    def get_by_name(self, name: str) -> Optional[Character]:
+    def get_character_by_name(self, name: str) -> Optional[Character]:
         for character in self._characters:
             if name == character.name:
                 return character
 
         return None
 
-    def add(self, character: Character) -> None:
+    def add_character(self, character: Character) -> None:
         new_char = character
         character_names = self.get_character_names()
         if new_char.name in character_names:
@@ -86,13 +102,16 @@ class Characters:
 
         self._characters.append(new_char)
 
-    def remove(self, character: Character) -> None:
+    def remove_character(self, character: Character) -> None:
         self._characters.remove(character)
 
-    def remove_by_name(self, character_name: str) -> None:
+    def remove_character_by_name(self, character_name: str) -> None:
         if character_name in self.get_character_names():
-            character = self.get_by_name(character_name)
+            character = self.get_character_by_name(character_name)
             self._characters.remove(character)
 
-    def to_json_formattable(self) -> Dict[str, Dict[str, Union[str, int]]]:
+    def get_roster(self) -> Dict[str, Dict[str, Union[str, int]]]:
         return {y.name: y.entry() for y in self._characters}
+
+    def get_selected_data(self) -> dict[str, str]:
+        return  {"weather": str(self.weather.name.lower()), "background": self.background}

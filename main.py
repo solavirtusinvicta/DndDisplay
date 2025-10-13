@@ -6,19 +6,23 @@ import tornado.ioloop
 import tornado.web
 import tornado.websocket
 
-from character import Character, Characters
+from character import Character, WebpageData
 from control import ControlHandler
 from display import DisplayHandler
+from utility import STATIC_DIR, get_options, Weather
 
 clients = set()
-STATIC_DIR = os.path.join(os.path.dirname(__file__), "static")
 assert os.path.isdir(STATIC_DIR)
-roster = Characters()
+webpage_data = WebpageData()
+
+
+# TODO: Features:
+# status effects (poisoned, stunned, etc)
 
 
 def broadcast():
     for c in list(clients):
-        c.write_message({"characters": roster.to_json_formattable()})
+        c.write_message({"characters": webpage_data.get_roster()} | get_options() | webpage_data.get_selected_data())
 
 
 class MainHandler(tornado.web.RequestHandler):
@@ -29,7 +33,7 @@ class MainHandler(tornado.web.RequestHandler):
 class WSHandler(tornado.websocket.WebSocketHandler):
     def open(self):
         clients.add(self)
-        self.write_message({"characters": roster.to_json_formattable()})
+        self.write_message({"characters": webpage_data.get_roster()} | get_options() | webpage_data.get_selected_data())
 
     def on_close(self):
         clients.discard(self)
@@ -42,7 +46,7 @@ class BaseCharacterHandler(tornado.web.RequestHandler):
 
     @staticmethod
     def get_character(name: str) -> Optional[Character]:
-        return roster.get_by_name(name)
+        return webpage_data.get_character_by_name(name)
 
 
 class UpdateHpHandler(BaseCharacterHandler):
@@ -59,7 +63,7 @@ class UpdateHpHandler(BaseCharacterHandler):
 class UpdateInitiativeHandler(BaseCharacterHandler):
     def post(self):
         name, initiative = self.json_parse("name", "initiative")
-        character = roster.get_by_name(name)
+        character = webpage_data.get_character_by_name(name)
 
         if character is not None:
             character.update_initiative(initiative)
@@ -96,34 +100,48 @@ class AddHandler(BaseCharacterHandler):
             with open(filepath, "wb") as f:
                 f.write(fileinfo["body"])
             image_url = f"/static/{fileinfo['filename']}"
-        roster.add(Character(name, hp, max_hp, image_url))
+        webpage_data.add_character(Character(name, hp, max_hp, image_url))
         broadcast()
 
 
 class AddAbilityHandler(BaseCharacterHandler):
     def post(self):
         name, ability = self.json_parse("name", "ability")
-        roster.get_by_name(name).add_ability(ability)
+        webpage_data.get_character_by_name(name).add_ability(ability)
         broadcast()
 
 
 class RemoveAbilityHandler(BaseCharacterHandler):
     def post(self):
         name, ability = self.json_parse("name", "ability")
-        roster.get_by_name(name).remove_ability(ability)
+        webpage_data.get_character_by_name(name).remove_ability(ability)
+        broadcast()
+
+
+class SetWeatherHandler(BaseCharacterHandler):
+    def post(self):
+        weather = list(self.json_parse("weather"))[0]
+        webpage_data.set_weather(Weather(weather))
+        broadcast()
+
+
+class SetBackgroundHandler(BaseCharacterHandler):
+    def post(self):
+        background = list(self.json_parse("background"))[0]
+        webpage_data.set_background(background)
         broadcast()
 
 
 class RemoveHandler(BaseCharacterHandler):
     def post(self):
         name = self.json_parse("name")
-        roster.remove_by_name(name)
+        webpage_data.remove_character_by_name(name)
         broadcast()
 
 class SetAvailableAbilitiesHandler(BaseCharacterHandler):
     def post(self):
         name, ability = self.json_parse("name", "ability")
-        character = roster.get_by_name(name)
+        character = webpage_data.get_character_by_name(name)
         if character is not None:
             character.toggle_ability(ability)
             broadcast()
@@ -141,6 +159,8 @@ def make_app():
         (r"/update", UpdateHpHandler),
         (r"/updateInitiative", UpdateInitiativeHandler),
         (r"/setAvailableAbilities", SetAvailableAbilitiesHandler),
+        (r"/setBg", SetBackgroundHandler),
+        (r"/setWeather", SetWeatherHandler),
         (r"/static/(.*)", tornado.web.StaticFileHandler, {"path": STATIC_DIR}),
     ], debug=True)
 
