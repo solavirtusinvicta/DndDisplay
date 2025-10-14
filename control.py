@@ -49,8 +49,7 @@ class ControlHandler(tornado.web.RequestHandler):
                   <button onclick="updateChar('${c}', 1)">+1</button>
                   <button onclick="updateChar('${c}', -1)">-1</button>
                   <button onclick="removeChar('${c}')">Remove</button></p>
-                  <span>Initiative: ${chars[c].initiative} </span><input id="initiative${c}" name="initiative" type="number" placeholder="Initiative" style="width: 45px">
-                  <button id="updateInitiative${c}">Update</button>
+                  <span>Initiative: ${chars[c].initiative} </span><input id="initiative${c}" name="initiative" type="number" placeholder="Initiative" style="width: 45px" onchange="updateInitiative('${c}', this.value)" value="${chars[c].initiative}">
                   <input id="abilityInput${c}" name="ability" placeholder="Ability Name" pattern="[A-Za-z]+" required>
                   <button id="addAbilityBtn${c}">Add Ability</button>
                   <p>Abilities:</p>`;
@@ -74,7 +73,6 @@ class ControlHandler(tornado.web.RequestHandler):
                 if (e.target.matches("button[id^='updateInitiative']")) {
                     const c = e.target.id.replace("updateInitiative", "");
                     const initiative = document.getElementById("initiative" + c).value;
-                    updateInitiative(c, initiative);
                 }
             });
         }
