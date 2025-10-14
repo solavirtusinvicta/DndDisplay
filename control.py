@@ -6,7 +6,6 @@ class ControlHandler(tornado.web.RequestHandler):
         self.write("""
         <h1>Control Panel</h1>
         <div id="background"></div>
-        <button type="submit">Set Background</button>
         <form id="addForm" enctype="multipart/form-data">
           <input name="name" placeholder="Character Name" pattern="[A-Za-z]+" required>
           <input name="hp" type="number" placeholder="HP" style="width: 50px" required><span> / </span>
