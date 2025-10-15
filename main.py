@@ -134,7 +134,7 @@ class SetBackgroundHandler(BaseCharacterHandler):
 
 class RemoveHandler(BaseCharacterHandler):
     def post(self):
-        name = self.json_parse("name")
+        name = list(self.json_parse("name"))[0]
         webpage_data.remove_character_by_name(name)
         broadcast()
 
